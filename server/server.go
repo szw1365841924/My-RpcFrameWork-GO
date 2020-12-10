@@ -24,6 +24,7 @@ var DefaultOption = &Option{
 	CodecType:   codec.GobType,
 }
 
+// 服务端
 type Server struct{}
 
 func NewServer() *Server {

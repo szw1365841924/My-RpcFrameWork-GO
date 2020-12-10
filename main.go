@@ -1,12 +1,12 @@
 package main
 
 import (
-	"Project/My-RpcFrameWork-GO/codec"
+	"Project/My-RpcFrameWork-GO/client"
 	"Project/My-RpcFrameWork-GO/server"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -21,26 +21,26 @@ func startServer(addr chan string) {
 }
 
 func main() {
+	log.SetFlags(0)
 	addr := make(chan string)
 	go startServer(addr)
-
-	conn, _ := net.Dial("tcp", <-addr)
+	client, _ := client.Dial("tcp", <-addr)
 	defer func() {
-		conn.Close()
+		client.Close()
 	}()
-
-	time.Sleep(time.Second)
-	_ = json.NewEncoder(conn).Encode(server.DefaultOption)
-	cc := codec.NewGobCodec(conn)
+	time.Sleep(time.Second * 2)
+	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
-		h := &codec.Header{
-			ServiceMethod: "Foo.Sum",
-			Sequence:      uint64(i),
-		}
-		cc.Write(h, fmt.Sprintf("geerpc req %d", h.Sequence))
-		cc.ReadHeader(h)
-		var reply string
-		cc.ReadBody(&reply)
-		log.Println("reply:", reply)
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			args := fmt.Sprintf("rpc req %d", i)
+			var reply string
+			if err := client.Call("Foo.Sum", args, &reply); err != nil {
+				log.Fatal("call Foo.Sum error:", err)
+			}
+			log.Println("reply:", reply)
+		}(i)
 	}
+	wg.Wait()
 }
