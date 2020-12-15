@@ -3,6 +3,7 @@ package main
 import (
 	"Project/My-RpcFrameWork-GO/client"
 	"Project/My-RpcFrameWork-GO/server"
+	"context"
 	"log"
 	"net"
 	"sync"
@@ -29,6 +30,7 @@ type Args struct{ Num1, Num2 int }
 
 func (f Foo) Sum(args Args, reply *int) error {
 	*reply = args.Num1 + args.Num2
+	time.Sleep(time.Second * 10)
 	return nil
 }
 
@@ -48,7 +50,8 @@ func main() {
 			defer wg.Done()
 			args := &Args{Num1: i, Num2: i * i}
 			var reply int
-			if err := client.Call("Foo.Sum", args, &reply); err != nil {
+			ctx, _ := context.WithTimeout(context.Background(), time.Second)
+			if err := client.Call(ctx, "Foo.Sum", args, &reply); err != nil {
 				log.Fatal("call Foo.Sum error:", err)
 			}
 			log.Printf("%d + %d = %d", args.Num1, args.Num2, reply)
