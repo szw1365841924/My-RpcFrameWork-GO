@@ -8,13 +8,19 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
 )
 
-const MagicNumber = 0xCAFEBABE
+const (
+	MagicNumber      = 0xCAFEBABE
+	Connected        = "200 Connected to Gee RPC"
+	DefaultRPCPath   = "/_geeprc_"
+	DefaultDebugPath = "/debug/geerpc"
+)
 
 // 魔数和编解码方式
 type Option struct {
@@ -28,6 +34,32 @@ var DefaultOption = &Option{
 	MagicNumber:       MagicNumber,
 	CodecType:         codec.GobType,
 	ConnectionTimeout: time.Second * 10,
+}
+
+func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if req.Method != "CONNECT" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = io.WriteString(w, "405 must CONNECT\n")
+		return
+	}
+	conn, _, err := w.(http.Hijacker).Hijack()
+	if err != nil {
+		log.Print("rpc hijacking ", req.RemoteAddr, ": ", err.Error())
+		return
+	}
+	_, _ = io.WriteString(conn, "HTTP/1.0 "+Connected+"\n\n")
+	server.ServerConn(conn)
+}
+
+func (server *Server) HandleHTTP() {
+	http.Handle(DefaultRPCPath, server)
+	http.Handle(DefaultDebugPath, debugHTTP{server})
+	log.Println("rpc server debug path:", DefaultDebugPath)
+}
+
+func HandleHTTP() {
+	DefaultServer.HandleHTTP()
 }
 
 // 服务端
